@@ -4,58 +4,95 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <title>CopyTester</title>
 
     <style>
         body {
             font-family: Arial, sans-serif;
             max-width: 900px;
-            margin: 60px auto;
-            padding: 0 25px;
+            margin: 40px auto;
+            padding: 0 20px;
+            line-height: 1.6;
+            background: #f7f7f7;
         }
 
         h1 {
-            margin-bottom: 10px;
+            margin-bottom: 5px;
         }
 
         .description {
-            color: #666;
-            margin-bottom: 40px;
+            margin-top: 0;
+            margin-bottom: 30px;
         }
 
         label {
             display: block;
             font-weight: bold;
-            margin-top: 25px;
-            margin-bottom: 10px;
+            margin-top: 20px;
+            margin-bottom: 8px;
         }
 
         select {
             width: 100%;
-            padding: 12px;
+            padding: 10px;
             font-size: 16px;
         }
 
-        textarea {
-            width: 100%;
-            height: 350px;
-            padding: 15px;
-            font-size: 16px;
-            line-height: 1.6;
-            box-sizing: border-box;
-            resize: vertical;
+        .toolbar {
+            margin-top: 5px;
+            margin-bottom: 5px;
         }
 
-        button {
-            margin-top: 25px;
-            padding: 13px 30px;
-            font-size: 16px;
+        .bold-button {
+            width: 45px;
+            height: 40px;
+            font-size: 20px;
             cursor: pointer;
+        }
+
+        .editor {
+            width: 100%;
+            min-height: 300px;
+            box-sizing: border-box;
+            padding: 15px;
+            border: 1px solid #aaa;
+            border-radius: 4px;
+            background: white;
+            font-size: 16px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+
+        .editor:empty:before {
+            content: attr(data-placeholder);
+            color: #888;
+        }
+
+        .analyze-button {
+            margin-top: 20px;
+            width: 100%;
+            padding: 13px;
+            font-size: 17px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        #result {
+            margin-top: 25px;
+            padding: 20px;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .bold-part {
+            margin: 8px 0;
+            padding: 8px;
+            background: #f2f2f2;
         }
     </style>
 </head>
-
 
 <body>
 
@@ -66,53 +103,163 @@
     </p>
 
 
-    <label for="experiment">
-        실험 선택
-    </label>
+    <label for="experiment">실험 선택</label>
 
     <select id="experiment">
-
-        <option value="HPLC">
-            HPLC
-        </option>
-
-        <option value="hydrogen">
-            수소 이야기
-        </option>
-
-        <option value="hess">
-            헤스의 법칙
-        </option>
-
-        <option value="iodine">
-            아이오딘 적정
-        </option>
-
-        <option value="pigment">
-            색소의 분리와 흡광 분석
-        </option>
-
-        <option value="henry">
-            이산화탄소의 헨리상수
-        </option>
-
+        <option value="HPLC">HPLC</option>
+        <option value="hydrogen">수소 이야기</option>
+        <option value="hess">헤스의 법칙</option>
+        <option value="iodine">아이오딘 적정</option>
+        <option value="pigment">색소의 분리와 흡광 분석</option>
+        <option value="henry">이산화탄소의 헨리상수</option>
     </select>
 
 
-    <label for="reportText">
-        검사할 텍스트
-    </label>
+    <label>검사할 텍스트</label>
 
-    <textarea
+    <p>
+        CopyKiller에서 표절로 탐지된 부분을 드래그한 뒤
+        <b>B</b> 버튼을 눌러 굵게 표시하세요.
+    </p>
+
+
+    <div class="toolbar">
+        <button
+            type="button"
+            class="bold-button"
+            id="boldButton"
+            title="선택 영역 굵게 표시"
+        >
+            <b>B</b>
+        </button>
+    </div>
+
+
+    <div
         id="reportText"
-        placeholder="카피킬러에서 표절로 탐지된 텍스트를 여기에 붙여넣으세요."
-    ></textarea>
+        class="editor"
+        contenteditable="true"
+        data-placeholder="보고서 텍스트를 여기에 붙여넣으세요."
+    ></div>
 
 
-    <button id="analyzeButton">
+    <button
+        type="button"
+        class="analyze-button"
+        id="analyzeButton"
+    >
         분석하기
     </button>
 
+
+    <div id="result"></div>
+
+
+    <!-- 211개 표현 데이터 -->
+    <script src="phrases.js"></script>
+
+
+    <script>
+
+        // Bold 버튼
+        document
+            .getElementById("boldButton")
+            .addEventListener("mousedown", function(event) {
+
+                // 버튼을 눌렀을 때 텍스트 선택이 풀리는 것을 방지
+                event.preventDefault();
+
+                document.execCommand("bold", false, null);
+            });
+
+
+        // 분석 버튼
+        document
+            .getElementById("analyzeButton")
+            .addEventListener("click", function() {
+
+                const editor =
+                    document.getElementById("reportText");
+
+                const experiment =
+                    document.getElementById("experiment").value;
+
+                const result =
+                    document.getElementById("result");
+
+
+                // 굵게 표시된 모든 부분 검색
+                const boldElements =
+                    editor.querySelectorAll("strong, b");
+
+
+                if (boldElements.length === 0) {
+
+                    result.style.display = "block";
+
+                    result.innerHTML =
+                        "<b>굵게 표시된 부분이 없습니다.</b><br>" +
+                        "CopyKiller에서 탐지된 부분을 드래그한 뒤 B 버튼을 눌러 주세요.";
+
+                    return;
+                }
+
+
+                // 굵은 문자열 추출
+                const boldTexts = [];
+
+                boldElements.forEach(element => {
+
+                    const text =
+                        element.innerText.trim();
+
+                    if (text.length > 0) {
+                        boldTexts.push(text);
+                    }
+
+                });
+
+
+                // 결과 출력
+                let html = "";
+
+                html += "<h2>분석 대상</h2>";
+
+                html +=
+                    "<p>선택한 실험: <b>" +
+                    document.getElementById("experiment")
+                        .options[
+                            document.getElementById("experiment")
+                                .selectedIndex
+                        ].text +
+                    "</b></p>";
+
+                html +=
+                    "<p>굵게 표시된 구간: <b>" +
+                    boldTexts.length +
+                    "개</b></p>";
+
+
+                boldTexts.forEach((text, index) => {
+
+                    html +=
+                        '<div class="bold-part">' +
+                        "<b>구간 " +
+                        (index + 1) +
+                        "</b><br>" +
+                        text +
+                        "</div>";
+
+                });
+
+
+                result.innerHTML = html;
+
+                result.style.display = "block";
+
+            });
+
+    </script>
 
 </body>
 
