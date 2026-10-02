@@ -626,7 +626,23 @@
 
             }
 
-
+            html +=
+                "<hr>" +
+                "<p>전체 어절 수: <b>" +
+                totalWords +
+                "</b></p>";
+            
+            html +=
+                "<p>보정표절값: <b>" +
+                correctedTotal.toFixed(3) +
+                "</b></p>";
+            
+            html +=
+                "<p style='font-size:24px; font-weight:bold;'>" +
+                "보정 표절률: " +
+                correctedRate.toFixed(2) +
+                "%" +
+                "</p>";
             result.innerHTML = html;
 
             result.style.display = "block";
