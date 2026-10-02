@@ -170,8 +170,8 @@
         .addEventListener("mousedown", function(event) {
 
             event.preventDefault();
-
             document.execCommand("bold", false, null);
+
         });
 
 
@@ -185,18 +185,39 @@
             .toLowerCase()
             .replace(/\s+/g, " ")
             .trim();
+
     }
 
 
     // ----------------------------
-    // 한 Bold 구간 분석
+    // 어절 수 계산
+    // ----------------------------
+
+    function countWords(text) {
+
+        const normalized = normalizeText(text);
+
+        if (normalized.length === 0) {
+            return 0;
+        }
+
+        return normalized
+            .split(/\s+/)
+            .filter(word => word.length > 0)
+            .length;
+
+    }
+
+
+    // ----------------------------
+    // Bold 구간 하나 분석
     // ----------------------------
 
     function analyzeBoldText(text, experiment) {
 
         const normalizedText = normalizeText(text);
 
-        // 선택한 실험의 데이터만 가져오기
+        // 선택한 실험의 데이터만 사용
         // 긴 n-gram부터 검사
         const candidates = phraseData
             .filter(item => item.experiment === experiment)
@@ -205,65 +226,152 @@
 
         const matches = [];
 
-        // 이미 사용된 문자열 범위
-        const occupied = new Array(normalizedText.length).fill(false);
+        // 각 글자가 이미 다른 n-gram에 사용되었는지 기록
+        const occupied =
+            new Array(normalizedText.length).fill(false);
 
 
         candidates.forEach(item => {
 
-            const phrase = normalizeText(item.phrase);
+            const phrase =
+                normalizeText(item.phrase);
 
             let startIndex = 0;
+
 
             while (true) {
 
                 const index =
-                    normalizedText.indexOf(phrase, startIndex);
+                    normalizedText.indexOf(
+                        phrase,
+                        startIndex
+                    );
+
 
                 if (index === -1) {
                     break;
                 }
 
+
                 const endIndex =
                     index + phrase.length;
 
 
-                // 이미 더 긴 표현이 사용한 범위인지 검사
+                // 더 긴 표현과 겹치는지 확인
                 let overlap = false;
 
-                for (let i = index; i < endIndex; i++) {
+                for (
+                    let i = index;
+                    i < endIndex;
+                    i++
+                ) {
 
                     if (occupied[i]) {
                         overlap = true;
                         break;
                     }
+
                 }
 
 
-                // 겹치지 않을 경우만 채택
+                // 겹치지 않는 경우만 채택
                 if (!overlap) {
 
-                    for (let i = index; i < endIndex; i++) {
+                    for (
+                        let i = index;
+                        i < endIndex;
+                        i++
+                    ) {
+
                         occupied[i] = true;
+
                     }
 
+
                     matches.push({
+
                         phrase: item.phrase,
+
                         n: item.n,
+
                         weight: item.weight,
+
                         correctedValue:
                             item.n * item.weight
+
                     });
+
                 }
 
 
-                startIndex = index + phrase.length;
+                startIndex =
+                    index + phrase.length;
+
             }
 
         });
 
 
-        return matches;
+        // Bold된 전체 어절 수
+        const boldWordCount =
+            countWords(normalizedText);
+
+
+        // DB와 일치한 부분의 어절 수
+        let matchedWordCount = 0;
+
+        matches.forEach(match => {
+
+            matchedWordCount += match.n;
+
+        });
+
+
+        // DB에 없는 Bold 어절
+        // → w = 1로 처리
+        const unmatchedWordCount =
+            Math.max(
+                0,
+                boldWordCount - matchedWordCount
+            );
+
+
+        // DB 일치 부분의 보정값
+        let matchedCorrectedValue = 0;
+
+        matches.forEach(match => {
+
+            matchedCorrectedValue +=
+                match.correctedValue;
+
+        });
+
+
+        // DB 비일치 부분은 w = 1
+        const unmatchedCorrectedValue =
+            unmatchedWordCount;
+
+
+        // 이 Bold 구간의 최종 보정값
+        const correctedValue =
+            matchedCorrectedValue +
+            unmatchedCorrectedValue;
+
+
+        return {
+
+            matches,
+
+            boldWordCount,
+
+            matchedWordCount,
+
+            unmatchedWordCount,
+
+            correctedValue
+
+        };
+
     }
 
 
@@ -275,17 +383,47 @@
         .getElementById("analyzeButton")
         .addEventListener("click", function() {
 
+
             const editor =
                 document.getElementById("reportText");
 
+
             const experiment =
                 document.getElementById("experiment").value;
+
 
             const result =
                 document.getElementById("result");
 
 
-            // Bold 부분만 가져오기
+            // ----------------------------
+            // 전체 보고서 어절 수
+            // ----------------------------
+
+            const fullText =
+                editor.innerText.trim();
+
+
+            const totalWords =
+                countWords(fullText);
+
+
+            if (totalWords === 0) {
+
+                result.style.display = "block";
+
+                result.innerHTML =
+                    "<b>텍스트를 입력해 주세요.</b>";
+
+                return;
+
+            }
+
+
+            // ----------------------------
+            // Bold 부분 가져오기
+            // ----------------------------
+
             const boldElements =
                 editor.querySelectorAll("strong, b");
 
@@ -299,48 +437,81 @@
                     "CopyKiller에서 탐지된 부분을 굵게 표시해 주세요.";
 
                 return;
+
             }
 
 
-            const boldTexts = [];
-
-            boldElements.forEach(element => {
-
-                const text = element.innerText.trim();
-
-                if (text.length > 0) {
-                    boldTexts.push(text);
-                }
-
-            });
-
-
             // ----------------------------
-            // 실제 분석
+            // 전체 계산
             // ----------------------------
 
             let allMatches = [];
 
-            boldTexts.forEach(text => {
+            let totalBoldWords = 0;
 
-                const matches =
-                    analyzeBoldText(text, experiment);
+            let totalMatchedWords = 0;
 
-                allMatches =
-                    allMatches.concat(matches);
+            let totalUnmatchedWords = 0;
 
-            });
-
-
-            // Σ(w × n)
             let correctedTotal = 0;
 
-            allMatches.forEach(match => {
+
+            boldElements.forEach(element => {
+
+                const text =
+                    element.innerText.trim();
+
+
+                if (text.length === 0) {
+                    return;
+                }
+
+
+                const analysis =
+                    analyzeBoldText(
+                        text,
+                        experiment
+                    );
+
+
+                allMatches =
+                    allMatches.concat(
+                        analysis.matches
+                    );
+
+
+                totalBoldWords +=
+                    analysis.boldWordCount;
+
+
+                totalMatchedWords +=
+                    analysis.matchedWordCount;
+
+
+                totalUnmatchedWords +=
+                    analysis.unmatchedWordCount;
+
 
                 correctedTotal +=
-                    match.weight * match.n;
+                    analysis.correctedValue;
 
             });
+
+
+            // ----------------------------
+            // 원래 탐지율
+            // ----------------------------
+
+            const originalRate =
+                (totalBoldWords / totalWords) * 100;
+
+
+            // ----------------------------
+            // 보정 표절률
+            // ----------------------------
+
+            const correctedRate =
+                (correctedTotal / totalWords) * 100;
 
 
             // ----------------------------
@@ -352,7 +523,36 @@
             html += "<h2>분석 결과</h2>";
 
 
-            // 최종 보정표절값
+            html +=
+                "<p>전체 어절 수: <b>" +
+                totalWords +
+                "</b></p>";
+
+
+            html +=
+                "<p>CopyKiller 탐지 어절 수: <b>" +
+                totalBoldWords +
+                "</b></p>";
+
+
+            html +=
+                "<p>자연 중복 DB 일치 어절 수: <b>" +
+                totalMatchedWords +
+                "</b></p>";
+
+
+            html +=
+                "<p>DB 비일치 탐지 어절 수: <b>" +
+                totalUnmatchedWords +
+                "</b></p>";
+
+
+            html +=
+                "<p>보정 전 탐지율: <b>" +
+                originalRate.toFixed(2) +
+                "%</b></p>";
+
+
             html +=
                 '<div style="' +
                 'font-size:24px;' +
@@ -362,30 +562,43 @@
                 'border:2px solid #333;' +
                 '">' +
 
-                "보정표절값 = " +
-                correctedTotal.toFixed(3) +
+                "보정 표절률 = " +
+                correctedRate.toFixed(2) +
+                "%" +
 
                 "</div>";
 
 
             html +=
-                "<p>계산식: Σ(w × n)</p>";
+                "<p>보정표절값 Σ(w × n) + DB 비일치 어절 = <b>" +
+                correctedTotal.toFixed(3) +
+                "</b></p>";
 
 
-            // 일치 표현이 하나도 없는 경우
+            // ----------------------------
+            // DB 일치 표현 출력
+            // ----------------------------
+
             if (allMatches.length === 0) {
 
                 html +=
-                    "<p>자연 중복 데이터와 일치하는 표현이 없습니다.</p>";
+                    "<h3>자연 중복 DB 일치 표현</h3>";
+
+                html +=
+                    "<p>일치하는 표현이 없습니다. " +
+                    "따라서 모든 Bold 어절에 w = 1이 적용됩니다.</p>";
 
             }
 
             else {
 
-                html += "<h3>일치 표현</h3>";
+                html +=
+                    "<h3>자연 중복 DB 일치 표현</h3>";
 
 
-                allMatches.forEach((match, index) => {
+                allMatches.forEach(
+                    (match, index) => {
+
 
                     html +=
                         '<div class="bold-part">' +
@@ -404,7 +617,7 @@
                         match.weight.toFixed(3) +
                         "<br>" +
 
-                        "w × n = " +
+                        "보정값 w × n = " +
                         match.correctedValue.toFixed(3) +
 
                         "</div>";
