@@ -1,16 +1,119 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
     <meta charset="UTF-8">
-    <title>실험 보고서 표절 재분석</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>CopyTester</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 60px auto;
+            padding: 0 25px;
+        }
+
+        h1 {
+            margin-bottom: 10px;
+        }
+
+        .description {
+            color: #666;
+            margin-bottom: 40px;
+        }
+
+        label {
+            display: block;
+            font-weight: bold;
+            margin-top: 25px;
+            margin-bottom: 10px;
+        }
+
+        select {
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 350px;
+            padding: 15px;
+            font-size: 16px;
+            line-height: 1.6;
+            box-sizing: border-box;
+            resize: vertical;
+        }
+
+        button {
+            margin-top: 25px;
+            padding: 13px 30px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
 </head>
 
-<body>
-    <h1>실험 보고서 표절 재분석</h1>
-    <p>웹사이트 테스트입니다.</p>
 
-    <button onclick="alert('정상 작동합니다!')">
-        분석 시작
+<body>
+
+    <h1>CopyTester</h1>
+
+    <p class="description">
+        실험 보고서의 자연적 표현 중복을 고려한 표절 검사
+    </p>
+
+
+    <label for="experiment">
+        실험 선택
+    </label>
+
+    <select id="experiment">
+
+        <option value="HPLC">
+            HPLC
+        </option>
+
+        <option value="hydrogen">
+            수소 이야기
+        </option>
+
+        <option value="hess">
+            헤스의 법칙
+        </option>
+
+        <option value="iodine">
+            아이오딘 적정
+        </option>
+
+        <option value="pigment">
+            색소의 분리와 흡광 분석
+        </option>
+
+        <option value="henry">
+            이산화탄소의 헨리상수
+        </option>
+
+    </select>
+
+
+    <label for="reportText">
+        검사할 텍스트
+    </label>
+
+    <textarea
+        id="reportText"
+        placeholder="카피킬러에서 표절로 탐지된 텍스트를 여기에 붙여넣으세요."
+    ></textarea>
+
+
+    <button id="analyzeButton">
+        분석하기
     </button>
+
+
 </body>
+
 </html>
