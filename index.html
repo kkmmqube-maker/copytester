@@ -159,108 +159,265 @@
     <script src="phrases.js"></script>
 
 
-    <script>
+   <script>
 
-        // Bold 버튼
-        document
-            .getElementById("boldButton")
-            .addEventListener("mousedown", function(event) {
+    // ----------------------------
+    // Bold 버튼
+    // ----------------------------
 
-                // 버튼을 눌렀을 때 텍스트 선택이 풀리는 것을 방지
-                event.preventDefault();
+    document
+        .getElementById("boldButton")
+        .addEventListener("mousedown", function(event) {
 
-                document.execCommand("bold", false, null);
-            });
+            event.preventDefault();
 
-
-        // 분석 버튼
-        document
-            .getElementById("analyzeButton")
-            .addEventListener("click", function() {
-
-                const editor =
-                    document.getElementById("reportText");
-
-                const experiment =
-                    document.getElementById("experiment").value;
-
-                const result =
-                    document.getElementById("result");
+            document.execCommand("bold", false, null);
+        });
 
 
-                // 굵게 표시된 모든 부분 검색
-                const boldElements =
-                    editor.querySelectorAll("strong, b");
+    // ----------------------------
+    // 문자열 정규화
+    // ----------------------------
+
+    function normalizeText(text) {
+
+        return text
+            .toLowerCase()
+            .replace(/\s+/g, " ")
+            .trim();
+    }
 
 
-                if (boldElements.length === 0) {
+    // ----------------------------
+    // 한 Bold 구간 분석
+    // ----------------------------
 
-                    result.style.display = "block";
+    function analyzeBoldText(text, experiment) {
 
-                    result.innerHTML =
-                        "<b>굵게 표시된 부분이 없습니다.</b><br>" +
-                        "CopyKiller에서 탐지된 부분을 드래그한 뒤 B 버튼을 눌러 주세요.";
+        const normalizedText = normalizeText(text);
 
-                    return;
+        // 선택한 실험의 데이터만 가져오기
+        // 긴 n-gram부터 검사
+        const candidates = phraseData
+            .filter(item => item.experiment === experiment)
+            .sort((a, b) => b.n - a.n);
+
+
+        const matches = [];
+
+        // 이미 사용된 문자열 범위
+        const occupied = new Array(normalizedText.length).fill(false);
+
+
+        candidates.forEach(item => {
+
+            const phrase = normalizeText(item.phrase);
+
+            let startIndex = 0;
+
+            while (true) {
+
+                const index =
+                    normalizedText.indexOf(phrase, startIndex);
+
+                if (index === -1) {
+                    break;
+                }
+
+                const endIndex =
+                    index + phrase.length;
+
+
+                // 이미 더 긴 표현이 사용한 범위인지 검사
+                let overlap = false;
+
+                for (let i = index; i < endIndex; i++) {
+
+                    if (occupied[i]) {
+                        overlap = true;
+                        break;
+                    }
                 }
 
 
-                // 굵은 문자열 추출
-                const boldTexts = [];
+                // 겹치지 않을 경우만 채택
+                if (!overlap) {
 
-                boldElements.forEach(element => {
-
-                    const text =
-                        element.innerText.trim();
-
-                    if (text.length > 0) {
-                        boldTexts.push(text);
+                    for (let i = index; i < endIndex; i++) {
+                        occupied[i] = true;
                     }
 
-                });
+                    matches.push({
+                        phrase: item.phrase,
+                        n: item.n,
+                        weight: item.weight,
+                        correctedValue:
+                            item.n * item.weight
+                    });
+                }
 
 
-                // 결과 출력
-                let html = "";
+                startIndex = index + phrase.length;
+            }
 
-                html += "<h2>분석 대상</h2>";
+        });
+
+
+        return matches;
+    }
+
+
+    // ----------------------------
+    // 분석 버튼
+    // ----------------------------
+
+    document
+        .getElementById("analyzeButton")
+        .addEventListener("click", function() {
+
+            const editor =
+                document.getElementById("reportText");
+
+            const experiment =
+                document.getElementById("experiment").value;
+
+            const result =
+                document.getElementById("result");
+
+
+            // Bold 부분만 가져오기
+            const boldElements =
+                editor.querySelectorAll("strong, b");
+
+
+            if (boldElements.length === 0) {
+
+                result.style.display = "block";
+
+                result.innerHTML =
+                    "<b>굵게 표시된 부분이 없습니다.</b><br>" +
+                    "CopyKiller에서 탐지된 부분을 굵게 표시해 주세요.";
+
+                return;
+            }
+
+
+            const boldTexts = [];
+
+            boldElements.forEach(element => {
+
+                const text = element.innerText.trim();
+
+                if (text.length > 0) {
+                    boldTexts.push(text);
+                }
+
+            });
+
+
+            // ----------------------------
+            // 실제 분석
+            // ----------------------------
+
+            let allMatches = [];
+
+            boldTexts.forEach(text => {
+
+                const matches =
+                    analyzeBoldText(text, experiment);
+
+                allMatches =
+                    allMatches.concat(matches);
+
+            });
+
+
+            // Σ(w × n)
+            let correctedTotal = 0;
+
+            allMatches.forEach(match => {
+
+                correctedTotal +=
+                    match.weight * match.n;
+
+            });
+
+
+            // ----------------------------
+            // 결과 출력
+            // ----------------------------
+
+            let html = "";
+
+            html += "<h2>분석 결과</h2>";
+
+
+            // 최종 보정표절값
+            html +=
+                '<div style="' +
+                'font-size:24px;' +
+                'font-weight:bold;' +
+                'margin:20px 0;' +
+                'padding:15px;' +
+                'border:2px solid #333;' +
+                '">' +
+
+                "보정표절값 = " +
+                correctedTotal.toFixed(3) +
+
+                "</div>";
+
+
+            html +=
+                "<p>계산식: Σ(w × n)</p>";
+
+
+            // 일치 표현이 하나도 없는 경우
+            if (allMatches.length === 0) {
 
                 html +=
-                    "<p>선택한 실험: <b>" +
-                    document.getElementById("experiment")
-                        .options[
-                            document.getElementById("experiment")
-                                .selectedIndex
-                        ].text +
-                    "</b></p>";
+                    "<p>자연 중복 데이터와 일치하는 표현이 없습니다.</p>";
 
-                html +=
-                    "<p>굵게 표시된 구간: <b>" +
-                    boldTexts.length +
-                    "개</b></p>";
+            }
+
+            else {
+
+                html += "<h3>일치 표현</h3>";
 
 
-                boldTexts.forEach((text, index) => {
+                allMatches.forEach((match, index) => {
 
                     html +=
                         '<div class="bold-part">' +
-                        "<b>구간 " +
+
+                        "<b>" +
                         (index + 1) +
+                        ". " +
+                        match.phrase +
                         "</b><br>" +
-                        text +
+
+                        "n = " +
+                        match.n +
+                        "<br>" +
+
+                        "w = " +
+                        match.weight.toFixed(3) +
+                        "<br>" +
+
+                        "w × n = " +
+                        match.correctedValue.toFixed(3) +
+
                         "</div>";
 
                 });
 
+            }
 
-                result.innerHTML = html;
 
-                result.style.display = "block";
+            result.innerHTML = html;
 
-            });
+            result.style.display = "block";
 
-    </script>
+        });
 
-</body>
-
-</html>
+</script>
